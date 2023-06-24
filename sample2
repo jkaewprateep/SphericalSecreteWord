@@ -1,0 +1,273 @@
+
+
+```
+
+
+
+import tensorflow as tf
+import time
+
+global vocab
+vocab = [ "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z" ]
+
+class CycleOne(tf.keras.layers.Layer):
+	def __init__(self, num_outputs):
+		super(CycleOne, self).__init__()
+		self.num_outputs = num_outputs
+		
+	def build(self, input_shape):
+		min_size_init = tf.keras.initializers.RandomUniform(minval=1, maxval=1, seed=None)
+		self.kernel = self.add_weight(shape=[int(input_shape[-1]),
+						self.num_outputs],
+                        initializer = min_size_init,
+                        trainable=True)
+		
+		array = tf.ones([ self.num_outputs, 1 ], dtype=tf.int64)
+		
+		self.kernel = array
+		self.kernel = tf.cast( self.kernel, dtype=tf.int64 )
+		
+	def call(self, inputs):
+		array = tf.ones([self.num_outputs, 1], dtype=tf.int64) * 6
+		array = tf.matmul(self.kernel, inputs) + array
+		array = array % 26
+		array = tf.cast( array, dtype=tf.float32 )
+		array = tf.where( tf.math.equal( tf.zeros([ array.shape[0], array.shape[1] ], dtype=tf.float32), array ), 26, array ).numpy()[0]
+		array = tf.cast( array, dtype=tf.int64 )
+		
+		return array
+		
+class CycleTwo(tf.keras.layers.Layer):
+	def __init__(self, num_outputs):
+		super(CycleTwo, self).__init__()
+		self.num_outputs = num_outputs
+		
+	def build(self, input_shape):
+		min_size_init = tf.keras.initializers.RandomUniform(minval=1, maxval=1, seed=None)
+		self.kernel = self.add_weight(shape=[int(input_shape[-1]),
+						self.num_outputs],
+                        initializer = min_size_init,
+                        trainable=True)
+		
+		array = tf.ones([ self.num_outputs, 1 ], dtype=tf.int64)
+		
+		self.kernel = array
+		self.kernel = tf.cast( self.kernel, dtype=tf.int64 )
+		
+	def call(self, inputs):
+		seq = [7, 7, 11, 22, 31]
+		
+		if self.num_outputs <= 5 :
+			array = tf.constant(seq[0:self.num_outputs], dtype=tf.int64)
+		else :
+			array = tf.constant(seq, dtype=tf.int64)
+		
+		paddedsize=tf.constant([[0, self.num_outputs - array.shape[0]]])
+		paddings = paddedsize
+		array = tf.pad(array, paddings, mode='CONSTANT', constant_values=0)
+		
+		array = tf.matmul(self.kernel, inputs) + array
+		array = array % 26
+		array = tf.cast( array, dtype=tf.float32 )
+		array = tf.where( tf.math.equal( tf.zeros([ array.shape[0], array.shape[1] ], dtype=tf.float32), array ), 26, array ).numpy()[0]
+		array = tf.cast( array, dtype=tf.int64 )
+		
+		return array
+
+
+def convert_constant_text_to_number_array( constant_text ):
+	global vocab
+	
+	layer = tf.keras.layers.StringLookup(vocabulary=vocab)
+	
+	sequences_mapping_string = layer(constant_text)
+	sequences_mapping_string = tf.constant( sequences_mapping_string, shape=(1, constant_text.shape[0]) )
+	
+	return sequences_mapping_string
+	
+def convert_text_to_constant_text( text, attention=None, paddedsize=12 ):
+	input_text = list(text)
+	input_text = tf.constant( input_text )
+	word_length = len( text )
+
+	paddedsize=tf.constant([[0, paddedsize - len(text)]])
+	paddings = paddedsize
+	word = tf.pad(input_text, paddings, mode='CONSTANT', constant_values="!")
+	
+	if attention == None :
+		attention = [ ]
+		
+	attention.append( 10  )
+
+	return word, attention, word_length
+	
+def convert_sentence_to_constant_text( sentence, attention=None, paddedsize=12 ):
+
+	words = sentence.split(" ")
+	num_word_in_sentence = len(words)
+	
+	# for fixed size of word input
+	max_length_word = max([ len(x) for x in words ])
+	
+	# for fixed size of word input
+	max_length_word = 12
+	
+	# for sentence space attention words
+	if attention == None :
+		attention = [ ]
+		
+	list_word_as_constant_text = [ ]
+	word_length = [ ]
+	for item in words :
+		array_text, new_attention, new_word_length = convert_text_to_constant_text( item, attention,  max_length_word )
+		array_text_as_sequence = convert_constant_text_to_number_array( array_text )
+		list_word_as_constant_text.append( array_text_as_sequence )
+		word_length.append( new_word_length )
+
+
+	print( word_length )
+	print( new_attention )
+	return list_word_as_constant_text, attention, word_length
+
+def decode_from_vocab( text_sequence ):
+	global vocab
+	
+	decoder = tf.keras.layers.StringLookup(vocabulary=vocab, output_mode="int", invert=True)
+	ans = decoder(text_sequence)
+
+	return ans
+	
+def feedforward( input ):
+	array_text, attention, word_length = convert_text_to_constant_text( input, None, len(input) )
+	array_text_as_sequence = convert_constant_text_to_number_array( array_text )
+	
+	layer = CycleOne( len(input) )
+	data = layer(array_text_as_sequence)
+
+	text = decode_from_vocab( data )
+
+	ans = ""
+	for item in text[0] :
+		ans = ans + item
+	
+	return str(ans.numpy())[2:-1]
+	
+def feedforward_two( input ):
+
+	array_text, attention, word_length = convert_text_to_constant_text( input, None, len(input) )
+	array_text_as_sequence = convert_constant_text_to_number_array( array_text )
+	
+	layer = CycleTwo( len(input) )
+	data = layer(array_text_as_sequence)
+	
+	text = decode_from_vocab( data )
+
+	ans = ""
+	for item in text :
+		ans = ans + item
+	
+	return str(ans.numpy())[2:-1]
+	
+def feedforward_sequence_number_one( input ):
+	layer = CycleOne( input.shape[0] )
+	data = layer( input )
+	
+	text = decode_from_vocab( data )
+
+	ans = ""
+	for item in text :
+		ans = ans + str(item.numpy())[2:-1]
+		
+	return ans
+	
+def feedforward_sequence_number_two( input ):
+	array_text, attention, word_length = convert_text_to_constant_text( input,  len(input) )
+	array_text_as_sequence = convert_constant_text_to_number_array( array_text )
+
+	layer = CycleTwo( input.shape[0] )
+	data = layer( input )
+	
+	text = decode_from_vocab( data )
+
+	ans = ""
+	for item in text :
+		ans = ans + str(item.numpy())[2:-1]
+		
+	return ans
+
+def update_word_into_sentence( input, list_word_as_constant_text, attention, word_length=None ):
+
+	new_list_word_as_constant_text, new_attention, new_word_length = convert_text_to_constant_text( input, attention, len(input) )
+	list_word_as_constant_text.append( convert_constant_text_to_number_array(new_list_word_as_constant_text) )
+	
+	if word_length == None :
+		word_length = [ ]
+	else :		
+		word_length.append( new_word_length )
+
+	return list_word_as_constant_text, new_attention, word_length
+
+
+
+
+print("")
+input_as_sentence = "hello my name is dekdee"
+
+
+input = "unqe"
+list_word_as_constant_text, attention, word_length = convert_sentence_to_constant_text( input, None, None )
+print( list_word_as_constant_text )
+print( attention )
+
+print("======================================================================================================")
+input = "monh"
+list_word_as_constant_text, attention, word_length = update_word_into_sentence( input, list_word_as_constant_text, attention, word_length )
+print( list_word_as_constant_text )
+print( attention )
+
+print("======================================================================================================")
+input = "fairy"
+list_word_as_constant_text, attention, word_length = update_word_into_sentence( input, list_word_as_constant_text, attention, word_length )
+print( list_word_as_constant_text )
+print( attention )
+
+print("======================================================================================================")
+input = "srund"
+list_word_as_constant_text, attention, word_length = update_word_into_sentence( input, list_word_as_constant_text, attention, word_length )
+print( list_word_as_constant_text )
+print( attention )
+
+print("======================================================================================================")
+
+
+input_as_sentence = "unqe monh fairy srund"
+ans = ""
+ans2 = ""
+
+for idx, item in enumerate(list_word_as_constant_text) :
+	text_length = len(item)
+	temp = feedforward_sequence_number_one( item )
+	temp2 = feedforward_two( temp[0:int(word_length[idx])] )
+	
+	
+	if idx == 0 :
+		ans = temp[0:int(word_length[idx])]
+		ans2 = temp2[0:int(word_length[idx])]
+	else :
+		ans = ans + " " + temp[0:int(word_length[idx])]
+		ans2 = ans2 + " " +temp2[0:int(word_length[idx])]
+
+print( "input_as_sentence: " )	
+print( input_as_sentence )
+print( "ans: " )
+print( ans )
+print( "ans2: " )
+print( ans2 )
+print( "attention: " )
+print( attention )
+	
+
+# output = feedforward( input )
+# print( "input: " + input )
+# print( "output: " + output )
+```
