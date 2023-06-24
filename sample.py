@@ -3,6 +3,9 @@
 
 
 
+
+
+
 import tensorflow as tf
 import time
 
@@ -30,6 +33,9 @@ class CycleOne(tf.keras.layers.Layer):
 		array = tf.ones([self.num_outputs, 1], dtype=tf.int64) * 6
 		array = tf.matmul(self.kernel, inputs) + array
 		array = array % 26
+		array = tf.cast( array, dtype=tf.float32 )
+		array = tf.where( tf.math.equal( tf.zeros([ array.shape[0], array.shape[1] ], dtype=tf.float32), array ), 26, array ).numpy()[0]
+		array = tf.cast( array, dtype=tf.int64 )
 		
 		return array
 		
@@ -103,10 +109,10 @@ def feedforward( input ):
 	text = decode_from_vocab( data )
 
 	ans = ""
-	for item in text[0] :
-		ans = ans + item
+	for item in text.numpy() :
+		ans = ans + str(item)[2:-1]
 	
-	return str(ans.numpy())[2:-1]
+	return ans
 	
 def feedforward_two( input ):
 	array_text = convert_text_to_constant_text( input,  len(input) )
@@ -141,6 +147,8 @@ print( convert_constant_text_to_number_array( convert_text_to_constant_text( "nk
 # tf.Tensor([[14 11 18 21 21  0  0  0  0  0  0  0]], shape=(1, 12), dtype=int64)
 print( convert_constant_text_to_number_array( convert_text_to_constant_text( "urcnz" ) ) )
 # tf.Tensor([[21 18  3 17 26  0  0  0  0  0  0  0]], shape=(1, 12), dtype=int64)
+
+
 
 
 ```
