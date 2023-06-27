@@ -1,0 +1,114 @@
+
+
+
+import tensorflow as tf
+import pyaudio as pyaudio
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.patches import Rectangle
+from matplotlib.artist import Artist
+
+import os
+from os.path import exists
+
+
+
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 8000
+CHUNK = 1024 * 4
+RECORD_SECONDS = 1
+
+global text
+text = [[], [], [], []]
+
+audio = pyaudio.PyAudio()
+stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+
+# fig = plt.figure()
+
+# fig, ax = plt.subplots(figsize=(6.5, 1.65), layout='constrained')
+fig, ax = plt.subplots(layout='constrained')
+plt.xlabel( "", fontsize=22 )
+plt.ylabel( "", fontsize=22  )
+plt.xticks([])
+plt.yticks([])
+
+# ax.set_title = "0"
+
+# image = plt.imread( "F:\\datasets\\downloads\\cats_name\\train\\Symbols\\01.jpg" )
+# ax = plt.axes(xlim=(0, 1), ylim=(2.5 * -16000, 2.5 * 16000))
+axes_plot = plt.axes(xlim=(0, 1), ylim=(-800000000, 800000000))
+line1, = axes_plot.plot([], [], lw=0.5, label=[])
+line2, = axes_plot.plot([], [], lw=0.5, label=[])
+line3, = axes_plot.plot([], [], lw=0.5, label=[])
+
+
+def animate(i ):
+	global CHUNK
+	global RATE
+	global text
+	
+	# print( text )
+	text = text[len(text) - 4:len(text)]
+
+	for i in range(0, int(RATE / CHUNK )):
+		data = stream.read(CHUNK)
+		audio_data = tf.io.decode_raw(tf.constant( data ), tf.int32)
+		audio_data_cliped = audio_data.numpy()[int(0.25 * audio_data.shape[0]):int(0.45 * audio_data.shape[0])]
+		# x_axis = tf.linspace( start=0, stop=1, num=audio_data.shape[0], name="x-axis", axis=0 )
+
+
+		###
+		stfts = tf.signal.stft(tf.cast(audio_data_cliped, dtype=tf.float32), frame_length=64, frame_step=128)	# audio_data
+		spectrograms = tf.abs(stfts)
+		spectrograms = spectrograms[..., tf.newaxis]
+		###
+		
+		
+		x_axis = tf.linspace( start=0, stop=1, num=spectrograms.shape[1], name="x-axis", axis=0 )
+		
+		x_label = int( tf.math.argmax( audio_data_cliped, axis=0, output_type=tf.dtypes.int32, name="x_label" ).numpy() )
+		x_label = audio_data_cliped[x_label]
+		
+		# print( ax )
+		# line1.set_data(x_axis, audio_data)
+		line1.set_data(x_axis, spectrograms[0])
+		line2.set_data(x_axis, spectrograms[1])
+		line3.set_data(x_axis, spectrograms[2])
+		
+		# ?
+		line1.set_label = x_label
+		line1.label = x_label
+		
+		# axes_plot.set_title = x_label
+		axes_plot.add_patch(Rectangle((0.25, -300000000), 0.45, 600000000, color='C1', alpha=0.8))
+		
+		# ?
+		axes_plot.label = x_label
+		
+		# print( text )
+		
+		if x_label > 53674854 :
+			text.append( "fuuu!" )
+		else :
+			text.append( "baaaa" )
+		
+
+		temp = ""
+		for item in text :
+			# print( item )
+			temp = temp + "| " + str(item) 
+		
+		print( temp )
+		
+	return line1, line2, line3, axes_plot
+
+
+while True:
+
+	ani = animation.FuncAnimation(fig, animate, interval=60, blit=True)
+	plt.show()
+	
+audio.terminate()
