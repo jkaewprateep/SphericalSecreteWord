@@ -1,0 +1,125 @@
+
+
+
+import tensorflow as tf
+import pyaudio as pyaudio
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.patches import Rectangle
+from matplotlib.artist import Artist
+
+import os
+from os.path import exists
+
+
+
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 8000
+CHUNK = 1024 * 4
+RECORD_SECONDS = 1
+
+global text
+text = [[], [], [], []]
+
+audio = pyaudio.PyAudio()
+stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+
+# fig = plt.figure()
+
+# fig, ax = plt.subplots(figsize=(6.5, 1.65), layout='constrained')
+fig, ax = plt.subplots(layout='constrained')
+plt.xlabel( "", fontsize=22 )
+plt.ylabel( "", fontsize=22  )
+plt.xticks([])
+plt.yticks([])
+
+# ax.set_title = "0"
+
+
+
+image = plt.imread( "F:\\temp\\Python\\Untitled.png" )
+# image = plt.imread( "F:\\datasets\\downloads\\cats_name\\train\\Symbols\\01.jpg" )
+im = plt.imshow(image)
+
+# ax = plt.axes(xlim=(0, 1), ylim=(2.5 * -16000, 2.5 * 16000))
+
+###
+axes_plot = plt.axes(xlim=(0, 1), ylim=(-800000000, 800000000))
+line1, = axes_plot.plot([], [], lw=0.5, label=[], color='red')
+line2, = axes_plot.plot([], [], lw=0.5, label=[], color='green')
+
+def animate(i ):
+	global CHUNK
+	global RATE
+	global text
+	
+	# print( text )
+	text = text[len(text) - 4:len(text)]
+
+	for i in range(0, int(RATE / CHUNK )):
+		data = stream.read(CHUNK)
+		audio_data = tf.io.decode_raw(tf.constant( data ), tf.int32)
+		audio_data_cliped = audio_data.numpy()[int(0.25 * audio_data.shape[0]):int(0.45 * audio_data.shape[0])]
+		# x_axis = tf.linspace( start=0, stop=1, num=audio_data.shape[0], name="x-axis", axis=0 )
+		
+
+
+		###
+		# stfts = tf.signal.stft(tf.cast(audio_data_cliped, dtype=tf.float32), frame_length=256, frame_step=64, fft_length=256)	# audio_data
+		stfts = tf.signal.stft(tf.cast(audio_data_cliped, dtype=tf.float32), frame_length=64, frame_step=128)	# audio_data
+		spectrograms = tf.abs(stfts)
+		spectrograms = spectrograms[..., tf.newaxis]
+		# print( spectrograms.shape ) 	# ( 3, 129)
+		
+		plot_spectrogram( spectrograms.numpy(), ax )
+		# image = tf.expand_dims( image, axis=2 )
+		# plt.show()
+		###
+		
+		# print( audio_data_cliped.shape )
+		# x_axis = tf.linspace( start=0, stop=1, num=spectrograms.shape[1], name="x-axis", axis=0 )
+		
+		# x_label = int( tf.math.argmax( audio_data_cliped, axis=0, output_type=tf.dtypes.int32, name="x_label" ).numpy() )
+		# x_label = audio_data_cliped[x_label]
+		# plt.imshow( image )
+		# im.set_array( mesh )
+		
+	return ax,
+
+def plot_spectrogram(spectrogram, ax):
+	# https://www.tensorflow.org/tutorials/audio/simple_audio
+
+	# print( spectrogram.shape )
+	if len(spectrogram.shape) > 2:
+		assert len(spectrogram.shape) == 3
+		spectrogram = tf.squeeze(spectrogram, axis=-1)
+		# Convert the frequencies to log scale and transpose, so that the time is
+		# represented on the x-axis (columns).
+		# Add an epsilon to avoid taking a log of zero.
+		log_spec = tf.experimental.numpy.log(tf.math.add(tf.transpose(spectrogram), tf.experimental.numpy.finfo(dtype=tf.float32).eps))
+		height = log_spec.shape[0]
+		width = log_spec.shape[1]
+		
+		x = tf.linspace( start=0, stop=tf.size(spectrogram), num=spectrogram.shape[0], name=None, axis=0 )
+		y = tf.range(height)
+		
+		x = tf.cast( x, dtype=tf.int32 )
+		y = tf.cast( y, dtype=tf.int32 )
+		
+		X, Y = tf.meshgrid(x, y)
+		
+		# print( X )
+		# print( Y )
+		
+		ax.pcolormesh(X, Y, log_spec)
+		# plt.show()
+	return
+
+while True:
+
+	ani = animation.FuncAnimation(fig, animate, interval=60, blit=True)
+	plt.show()
+	
+audio.terminate()
